@@ -3,7 +3,7 @@
 #
 # MySQL
 #
-# Description:	Manages a MySQL database as Linux-HA resource
+# Description:  Manages a MySQL database as Linux-HA resource
 #
 # Authors:	Alan Robertson:               DB2 Script
 #		Jakub Janczak:                rewrite as MySQL
@@ -14,8 +14,8 @@
 #		Yves Trudeau:                 add VIP support and improve replication
 #
 #
-# Support:	linux-ha@lists.linux-ha.org
-# License:	GNU General Public License (GPL)
+# Support:  linux-ha@lists.linux-ha.org
+# License:  GNU General Public License (GPL)
 #
 # (c) 2002-2005 International Business Machines, Inc.
 #     2005-2010 Linux-HA contributors
@@ -123,23 +123,23 @@ MYSQL_BINDIR=`dirname ${OCF_RESKEY_binary}`
 
 usage() {
   cat <<UEND
-	usage: $0 (start|stop|validate-all|meta-data|monitor|promote|demote|notify)
+usage: $0 (start|stop|validate-all|meta-data|monitor|promote|demote|notify)
 
-	$0 manages a MySQL Database as an HA resource.
+$0 manages a MySQL Database as an HA resource.
 
-	The 'start' operation starts the database.
-	The 'stop' operation stops the database.
-	The 'status' operation reports whether the database is running
-	The 'monitor' operation reports whether the database seems to be working
-	The 'promote' operation makes this mysql server run as master
-	The 'demote' operation makes this mysql server run as slave
-	The 'validate-all' operation reports whether the parameters are valid
+The 'start' operation starts the database.
+The 'stop' operation stops the database.
+The 'status' operation reports whether the database is running
+The 'monitor' operation reports whether the database seems to be working
+The 'promote' operation makes this mysql server run as master
+The 'demote' operation makes this mysql server run as slave
+The 'validate-all' operation reports whether the parameters are valid
 
 UEND
 }
 
 meta_data() {
-	cat <<END
+   cat <<END
 <?xml version="1.0"?>
 <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
 <resource-agent name="mysql">
@@ -381,7 +381,7 @@ set_read_only() {
         mysql_options="$mysql_options $MYSQL_OPTIONS_REPL"
     fi
     ocf_run $MYSQL $mysql_options \
-    -e "SET GLOBAL read_only=${ro_val}"
+        -e "SET GLOBAL read_only=${ro_val}"
 }
 
 get_read_only() {
@@ -395,7 +395,7 @@ get_read_only() {
     fi
     
     read_only_state=`$MYSQL $mysql_options \
-    -e "SHOW VARIABLES" | grep read_only | awk '{print $2}'`
+        -e "SHOW VARIABLES" | grep read_only | awk '{print $2}'`
     
     if [ "$read_only_state" = "ON" ]; then
         return 0
@@ -461,7 +461,7 @@ get_slave_info() {
         slave_io=`parse_slave_info Slave_IO_Running $tmpfile`
         last_errno=`parse_slave_info Last_Errno $tmpfile`
         secs_behind=`parse_slave_info Seconds_Behind_Master $tmpfile`
-        
+
         ocf_log debug "MySQL instance running as a replication slave"
     else
         # Instance produced an empty "SHOW SLAVE STATUS" output --
@@ -481,26 +481,19 @@ check_slave() {
     rc=$?
     
     if [ $rc -eq 0 ]; then
-        # Did we receive an error other than max_connections?
-        if [ $last_errno -ne 0 -a $last_errno -ne 1040 ]; then
+        if [ $last_errno -ne 0 ]; then
             # Whoa. Replication ran into an error. This slave has
             # diverged from its master. Make sure this resource
             # doesn't restart in place.
             ocf_log err "MySQL instance configured for replication, but replication has failed."
             ocf_log err "See $tmpfile for details"
-            
+
             # Just pull the reader VIP away, killing MySQL here would be pretty evil
-            # on a loaded server
-            
+            # on a loaded server            
             set_reader_vip_attr 0
+
             exit $OCF_SUCCESS
 
-        fi
-        
-        # If we got max_connections, let's remove the vip
-        if [ $last_errno -eq 1040 ]; then
-            set_reader_vip_attr 0
-            exit $OCF_SUCCESS
         fi
         
         if [ "$slave_io" != 'Yes' ]; then
@@ -522,12 +515,22 @@ check_slave() {
             
             # try to restart slave
             ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
-            -e "START SLAVE"
+                -e "START SLAVE"
             
             # Return success to prevent a restart
             exit $OCF_SUCCESS
         fi
         
+
+        if [ "$slave_sql" != 'Yes' ]; then
+            # We don't have a replication SQL thread running. Not a
+            # good thing. Try to recoved by restarting the resource in
+            # place.
+            ocf_log err "MySQL Slave SQL threads currently not running."
+            ocf_log err "See $tmpfile for details"
+            exit $OCF_ERR_GENERIC
+        fi
+
         if ocf_is_true $OCF_RESKEY_evict_outdated_slaves; then
             # We're supposed to bail out if we lag too far
             # behind. Let's check our lag.
@@ -540,7 +543,7 @@ check_slave() {
                 
                 exit $OCF_ERR_INSTALLED
             fi
-            elif ocf_is_ms; then
+        elif ocf_is_ms; then
             # Even if we're not set to evict lagging slaves, we can
             # still use the seconds behind master value to set our
             # master preference.
@@ -559,13 +562,12 @@ check_slave() {
         else
             set_reader_vip_attr 1
         fi
-        
+
         ocf_log debug "MySQL instance running as a replication slave"
         rm -f $tmpfile
     else
         # Instance produced an empty "SHOW SLAVE STATUS" output --
         # instance is not a slave
-        # TODO: Needs to handle when get_slave_info will return too many connections error
         rm -f $tmpfile
         ocf_log err "check_slave invoked on an instance that is not a replication slave."
         exit $OCF_ERR_GENERIC
@@ -604,9 +606,9 @@ set_master() {
     # reset with RESET MASTER.
     
     ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
-    -e "CHANGE MASTER TO MASTER_HOST='$new_master_host', \
-                             MASTER_USER='$OCF_RESKEY_replication_user', \
-    MASTER_PASSWORD='$OCF_RESKEY_replication_passwd' $master_params"
+        -e "CHANGE MASTER TO MASTER_HOST='$new_master_host', \
+        MASTER_USER='$OCF_RESKEY_replication_user', \
+        MASTER_PASSWORD='$OCF_RESKEY_replication_passwd' $master_params"
     
     rm -f $tmpfile
 }
@@ -653,7 +655,7 @@ unset_master(){
     # Now, stop the slave I/O thread and wait for relay log
     # processing to complete
     ocf_run $MYSQL $mysql_options \
-    -e "STOP SLAVE IO_THREAD"
+        -e "STOP SLAVE IO_THREAD"
     if [ $? -gt 0 ]; then
         ocf_log err "Error stopping slave IO thread"
         exit $OCF_ERR_GENERIC
@@ -661,7 +663,7 @@ unset_master(){
     
     while true; do
         $MYSQL $mysql_options \
-        -e 'SHOW PROCESSLIST\G' > $tmpfile
+            -e 'SHOW PROCESSLIST\G' > $tmpfile
         if grep 'Has read all relay log' $tmpfile >/dev/null; then
             ocf_log info "MySQL slave has finished processing relay log"
             break
@@ -677,7 +679,7 @@ unset_master(){
     
     # Now, stop all slave activity and unset the master host
     ocf_run $MYSQL $mysql_options \
-    -e "STOP SLAVE"
+        -e "STOP SLAVE"
     if [ $? -gt 0 ]; then
         ocf_log err "Error stopping rest slave threads"
         exit $OCF_ERR_GENERIC
@@ -690,7 +692,7 @@ unset_master(){
     rm -f $tmpfile
     
     ocf_run $MYSQL $mysql_options \
-    -e "CHANGE MASTER TO MASTER_HOST=''"
+        -e "CHANGE MASTER TO MASTER_HOST=''" 
     if [ $? -gt 0 ]; then
         ocf_log err "Failed to set master"
         exit $OCF_ERR_GENERIC
@@ -773,22 +775,26 @@ mysql_validate() {
 }
 
 mysql_status() {
+    # Set the log level of the error message (default:err)
+    local loglevel
+    loglevel=${1:-err}
+
     if [ ! -e $OCF_RESKEY_pid ]; then
-        ocf_log err "MySQL is not running"
+        ocf_log $loglevel "MySQL is not running"
         return $OCF_NOT_RUNNING;
     fi
-    
+
     pid=`cat $OCF_RESKEY_pid`;
     if [ -d /proc -a -d /proc/1 ]; then
         [ "u$pid" != "u" -a -d /proc/$pid ]
     else
         kill -s 0 $pid >/dev/null 2>&1
     fi
-    
+
     if [ $? -eq 0 ]; then
         return $OCF_SUCCESS;
     else
-        ocf_log err "MySQL not running: removing old PID file"
+        ocf_log $loglevel "MySQL not running: removing old PID file"
         rm -f $OCF_RESKEY_pid
         return $OCF_NOT_RUNNING;
     fi
@@ -796,7 +802,14 @@ mysql_status() {
 
 mysql_monitor() {
     local rc
-    mysql_status
+    local status_loglevel="err"
+
+    # Set loglevel to info during probe
+    if ocf_is_probe; then
+        status_loglevel="info"
+    fi
+
+    mysql_status $status_loglevel
     rc=$?
     
     # TODO: check max connections error
@@ -813,26 +826,26 @@ mysql_monitor() {
         if is_slave; then
             check_slave
         fi
-        
+
         local mysql_options
         mysql_options="$MYSQL_OPTIONS_LOCAL --user=$OCF_RESKEY_test_user --password=$OCF_RESKEY_test_passwd"
-        
+
         # Check for test table
-        ocf_run $MYSQL $mysql_options \
-        -e "SELECT COUNT(*) FROM $OCF_RESKEY_test_table"
+        ocf_run -q $MYSQL $mysql_options \
+            -e "SELECT COUNT(*) FROM $OCF_RESKEY_test_table"
         rc=$?
-        
+
         if [ $rc -ne 0 ]; then
-            ocf_log err "Failed to select from $test_table";
+            ocf_log err "Failed to select from $OCF_RESKEY_test_table";
             return $OCF_ERR_GENERIC;
         fi
     fi
     
     if ocf_is_ms && ! get_read_only; then
-        ocf_log info "MySQL monitor succeeded (master)";
+        ocf_log debug "MySQL monitor succeeded (master)";
         return $OCF_RUNNING_MASTER
     else
-        ocf_log info "MySQL monitor succeeded";
+        ocf_log debug "MySQL monitor succeeded";
         return $OCF_SUCCESS
     fi
 }
@@ -843,8 +856,8 @@ mysql_start() {
         # Initialize the ReaderVIP attribute, monitor will enable it
         set_reader_vip_attr 0
     fi
-    
-    mysql_status
+
+    mysql_status info
     if [ $? = $OCF_SUCCESS ]; then
         ocf_log info "MySQL already running"
         return $OCF_SUCCESS
@@ -902,11 +915,11 @@ mysql_start() {
     fi
     
     ${OCF_RESKEY_binary} --defaults-file=$OCF_RESKEY_config \
-    --pid-file=$OCF_RESKEY_pid \
-    --socket=$OCF_RESKEY_socket \
-    --datadir=$OCF_RESKEY_datadir \
-    --user=$OCF_RESKEY_user $OCF_RESKEY_additional_parameters \
-    $mysql_extra_params >/dev/null 2>&1 &
+        --pid-file=$OCF_RESKEY_pid \
+        --socket=$OCF_RESKEY_socket \
+        --datadir=$OCF_RESKEY_datadir \
+        --user=$OCF_RESKEY_user $OCF_RESKEY_additional_parameters \
+        $mysql_extra_params >/dev/null 2>&1 &
     rc=$?
     
     if [ $rc != 0 ]; then
@@ -915,16 +928,16 @@ mysql_start() {
     fi
     
     # Spin waiting for the server to come up.
-    # Let the CRM/LRM time us out if required
+    # Let the CRM/LRM time us out if required.
     start_wait=1
     while [ $start_wait = 1 ]; do
-        mysql_status
+        mysql_status info
         rc=$?
         if [ $rc = $OCF_SUCCESS ]; then
             start_wait=0
-            
-            elif [ $rc != $OCF_NOT_RUNNING ]; then
-            ocf_log info "MySQL start failed: $rc"
+
+        elif [ $rc != $OCF_NOT_RUNNING ]; then
+            ocf_log err "MySQL start failed: $rc"
             return $rc
         fi
         sleep 2
@@ -936,7 +949,7 @@ mysql_start() {
         # already promoted a master. So, we simply start in read only
         # mode.
         set_read_only on
-        
+
         # Now, let's see whether there is a master. We might be a new
         # node that is just joining the cluster, and the CRM may have
         # promoted a master before.
@@ -945,7 +958,7 @@ mysql_start() {
             ocf_log info "Changing MySQL configuration to replicate from $master_host."
             set_master $master_host
             ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
-            -e 'START SLAVE'
+                -e 'START SLAVE'
             if [ $? -ne 0 ]; then
                 ocf_log err "Failed to start slave"
                 return $OCF_ERR_GENERIC
@@ -968,7 +981,7 @@ mysql_start() {
             ocf_log info "No MySQL master present - clearing replication state"
             unset_master
         fi
-        
+
         # We also need to set a master preference, otherwise Pacemaker
         # won't ever promote us in the absence of any explicit
         # preference set by the administrator. We choose a low
@@ -1000,9 +1013,10 @@ mysql_stop() {
         set_reader_vip_attr 0
     fi
     
-    if [ ! -f $OCF_RESKEY_pid ]; then
-        ocf_log info "MySQL is not running"
-        return $OCF_SUCCESS
+    mysql_status info
+    rc=$?
+    if [ $rc = $OCF_NOT_RUNNING ]; then
+       return $OCF_SUCCESS
     fi
     
     pid=`cat $OCF_RESKEY_pid 2> /dev/null `
@@ -1012,28 +1026,28 @@ mysql_stop() {
         ocf_log err "MySQL couldn't be stopped"
         return $OCF_ERR_GENERIC
     fi
-    
+
     # stop waiting
     shutdown_timeout=15
     if [ -n "$OCF_RESKEY_CRM_meta_timeout" ]; then
         shutdown_timeout=$((($OCF_RESKEY_CRM_meta_timeout/1000)-5))
     fi
     count=0
-    while [ $count -lt $shutdown_timeout ]
-    do
-        mysql_status
+    while [ $count -lt $shutdown_timeout ]; do
+        mysql_status info
         rc=$?
         if [ $rc = $OCF_NOT_RUNNING ]; then
             break
         fi
         count=`expr $count + 1`
         sleep 1
-        ocf_log debug "MySQL still hasn't stopped yet. Waiting..."
+
+        ocf_log info "MySQL still hasn't stopped yet. Waiting..."
     done
-    
-    mysql_status
+
+    mysql_status info
     if [ $? != $OCF_NOT_RUNNING ]; then
-        ocf_log info "MySQL failed to stop after ${shutdown_timeout}s using SIGTERM. Trying SIGKILL..."
+        ocf_log warn "MySQL failed to stop after ${shutdown_timeout}s using SIGTERM. Trying SIGKILL..."
         /bin/kill -KILL $pid > /dev/null
     fi
     
@@ -1048,7 +1062,7 @@ mysql_promote() {
         return $OCF_NOT_RUNNING
     fi
     ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
-    -e "STOP SLAVE"
+        -e "STOP SLAVE"
     set_read_only off || return $OCF_ERR_GENERIC
     
     # Existing master gets a higher-than-default master preference, so
@@ -1065,6 +1079,12 @@ mysql_promote() {
 mysql_demote() {
     if ! mysql_status; then
         return $OCF_NOT_RUNNING
+    fi
+
+    set_read_only on
+    if [ $? -ne 0 ]; then
+        ocf_log err "Failed to set read-only";
+        return $OCF_ERR_GENERIC;
     fi
     
     # Return master preference to default, so the cluster manager gets
