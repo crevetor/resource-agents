@@ -660,7 +660,7 @@ unset_master(){
     while true; do
         $MYSQL $MYSQL_OPTIONS_REPL \
             -e 'SHOW PROCESSLIST\G' > $tmpfile
-        if grep 'Has read all relay log' $tmpfile >/dev/null; then
+        if grep -i 'has read all relay log' $tmpfile >/dev/null; then
             ocf_log info "MySQL slave has finished processing relay log"
             break
         fi
